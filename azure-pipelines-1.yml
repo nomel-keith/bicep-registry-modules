@@ -1,0 +1,106 @@
+trigger:
+  - main
+
+variables:
+  - name: resourceGroupName
+    value: 'rg-vnet-nsg-example'
+  - name: location
+    value: 'eastus'
+  - name: vnetName
+    value: 'myVNet'
+  - name: nsgName
+    value: 'myNSG'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Create Resource Group'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az group create --name $(resourceGroupName) --location $(location)
+
+- task: AzureCLI@2
+  displayName: 'Deploy Network Security Group'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
+        --parameters \
+          name=$(nsgName) \
+          securityRules="[
+            {
+              name: 'AllowHTTPInbound',
+              properties: {
+                protocol: 'Tcp',
+                sourcePortRange: '*',
+                destinationPortRange: '80',
+                sourceAddressPrefix: '*',
+                destinationAddressPrefix: '*',
+                access: 'Allow',
+                priority: 100,
+                direction: 'Inbound'
+              }
+            }
+          ]"
+
+- task: AzureCLI@2
+  displayName: 'Deploy Virtual Network'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
+        --parameters \
+          name=$(vnetName) \
+          addressPrefixes="['10.0.0.0/25']" \
+          subnets="[
+            {
+              name: 'dmz-subnet',
+              addressPrefix: '10.0.0.0/27'
+            },
+            {
+              name: 'app-subnet',
+              addressPrefix: '10.0.0.32/27'
+            },
+            {
+              name: 'data-subnet',
+              addressPrefix: '10.0.0.64/27'
+            }
+          ]"
+
+- task: AzureCLI@2
+  displayName: 'Associate NSG with Subnets'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Get the NSG resource ID
+      nsgId=$(az network nsg show --resource-group $(resourceGroupName) --name $(nsgName) --query id -o tsv)
+      
+      # Associate NSG with dmz-subnet and app-subnet
+      az network vnet subnet update \
+        --resource-group $(resourceGroupName) \
+        --vnet-name $(vnetName) \
+        --name dmz-subnet \
+        --network-security-group $nsgId
+
+      az network vnet subnet update \
+        --resource-group $(resourceGroupName) \
+        --vnet-name $(vnetName) \
+        --name app-subnet \
+        --network-security-group $nsgId
+
+      # Note: We're not associating the NSG with data-subnet in this example
