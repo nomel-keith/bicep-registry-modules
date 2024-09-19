@@ -11,7 +11,7 @@ variables:
   - name: nsgName
     value: 'myNSG'
   - name: staticWebAppName
-    value: 'my-static-webapp'
+    value: 'myznastatic123'
   - name: staticWebAppSku
     value: 'Free'
 
