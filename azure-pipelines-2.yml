@@ -12,7 +12,7 @@ variables:
     value: 'myNSG'
   - name: staticSiteName
     value: 'myznastatic123'
-  - name: staticWebAppSku
+  - name: staticSiteSku
     value: 'Free'
 
 pool:
