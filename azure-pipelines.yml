@@ -35,4 +35,4 @@ steps:
         --parameters \
           name=myVNet \
           addressPrefixes="['10.0.0.0/16']" \
-          subnets="[{'name': 'default', 'addressPrefix': '10.0.0.0/24'}]"
+          subnets="[{'name': 'dmz-subnet', 'addressPrefix': '10.0.0.0/24'}, {'name': 'app-subnet', 'addressPrefix': '10.0.1.0/24'}, {'name': 'data-subnet', 'addressPrefix': '10.0.2.0/24'}]"
