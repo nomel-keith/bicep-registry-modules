@@ -16,8 +16,8 @@ steps:
     targetType: 'inline'
     script: |
       echo "Current directory: $(pwd)"
-      echo "List of files in current directory:"
-      ls -R
+      echo "List of files in avm/res/network/virtual-network directory:"
+      ls -R $(Build.SourcesDirectory)/avm/res/network/virtual-network
 
 - task: AzureCLI@2
   inputs:
@@ -31,7 +31,7 @@ steps:
       # Deploy the Bicep template
       az deployment group create \
         --resource-group $(resourceGroupName) \
-        --template-file $(Build.SourcesDirectory)/main.bicep \
+        --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
         --parameters \
           name=myVNet \
           addressPrefixes="['10.0.0.0/16']" \
