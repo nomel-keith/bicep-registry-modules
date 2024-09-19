@@ -150,7 +150,7 @@ steps:
       set -e
       set -x
 
-      bicep_file="$(Build.SourcesDirectory)/avm/res/web/static-web-app/main.bicep"
+      bicep_file="$(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep"
       echo "Checking for Bicep file: $bicep_file"
       if [ ! -f "$bicep_file" ]; then
         echo "Error: Static Web App Bicep file not found at $bicep_file"
