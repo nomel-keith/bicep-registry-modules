@@ -5,7 +5,7 @@ variables:
   - name: resourceGroupName
     value: 'rg-vnet-nsg-swa-example'
   - name: location
-    value: 'eastus'
+    value: 'eastus2'
   - name: vnetName
     value: 'myVNet'
   - name: nsgName
