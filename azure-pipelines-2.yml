@@ -150,6 +150,10 @@ steps:
       set -e
       set -x
 
+      echo "Current working directory: $(pwd)"
+      echo "Listing contents of Build.SourcesDirectory:"
+      ls -R $(Build.SourcesDirectory)
+
       bicep_file="$(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep"
       echo "Checking for Bicep file: $bicep_file"
       if [ ! -f "$bicep_file" ]; then
@@ -157,18 +161,24 @@ steps:
         exit 1
       fi
 
+      echo "Bicep file found. Displaying first few lines:"
+      head -n 10 "$bicep_file"
+
       echo "Preparing deployment parameters"
       params=$(cat <<EOF
       {
-        "name": {"value": "$(staticWebAppName)"},
+        "name": {"value": "$(staticSiteName)"},
         "location": {"value": "$(location)"},
-        "sku": {"value": "$(staticWebAppSku)"},
+        "sku": {"value": "$(staticSiteSku)"},
         "allowConfigFileUpdates": {"value": true},
         "stagingEnvironmentPolicy": {"value": "Enabled"},
-        "enterpriseGradeCdnStatus": {"value": "Disabled"}
+        "enterpriseGradeCdnStatus": {"value": "Disabled"},
+        "provider": {"value": "None"},
+        "enableTelemetry": {"value": true}
       }
       EOF
       )
+      echo "Parameters: $params"
 
       echo "Starting Static Web App deployment"
       output=$(az deployment group create \
