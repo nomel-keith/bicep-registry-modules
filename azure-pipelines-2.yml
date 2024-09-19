@@ -1,0 +1,191 @@
+trigger:
+  - main
+
+variables:
+  - name: resourceGroupName
+    value: 'rg-vnet-nsg-swa-example'
+  - name: location
+    value: 'eastus'
+  - name: vnetName
+    value: 'myVNet'
+  - name: nsgName
+    value: 'myNSG'
+  - name: staticWebAppName
+    value: 'my-static-webapp'
+  - name: staticWebAppSku
+    value: 'Free'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Create Resource Group'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az group create --name $(resourceGroupName) --location $(location)
+
+- task: AzureCLI@2
+  displayName: 'Deploy Network Security Group'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Check if the Bicep file exists
+      if [ ! -f "$(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep" ]; then
+        echo "Error: NSG Bicep file not found"
+        exit 1
+      fi
+
+      # Deploy NSG with error handling
+      az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
+        --parameters name=$(nsgName) \
+        --parameters securityRules='[{"name":"AllowHTTPSInbound","properties":{"protocol":"Tcp","sourcePortRange":"*","destinationPortRange":"443","sourceAddressPrefix":"*","destinationAddressPrefix":"*","access":"Allow","priority":100,"direction":"Inbound"}}]' \
+        --debug
+
+      # Check deployment status
+      if [ $? -ne 0 ]; then
+        echo "Error: NSG deployment failed"
+        exit 1
+      fi
+
+- task: AzureCLI@2
+  displayName: 'Deploy Virtual Network'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      set -e
+      set -x
+
+      bicep_file="$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep"
+      echo "Checking for Bicep file: $bicep_file"
+      if [ ! -f "$bicep_file" ]; then
+        echo "Error: VNet Bicep file not found at $bicep_file"
+        exit 1
+      fi
+
+      echo "Preparing deployment parameters"
+      params=$(cat <<EOF
+      {
+        "name": {"value": "$(vnetName)"},
+        "addressPrefixes": {"value": ["10.0.0.0/25"]},
+        "subnets": {
+          "value": [
+            {
+              "name": "dmz-subnet",
+              "addressPrefix": "10.0.0.0/27"
+            },
+            {
+              "name": "app-subnet",
+              "addressPrefix": "10.0.0.32/27"
+            },
+            {
+              "name": "data-subnet",
+              "addressPrefix": "10.0.0.64/27"
+            }
+          ]
+        }
+      }
+      EOF
+      )
+
+      echo "Starting VNet deployment"
+      output=$(az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file "$bicep_file" \
+        --parameters "$params" \
+        --debug 2>&1)
+      
+      deployment_status=$?
+      echo "Deployment output:"
+      echo "$output"
+
+      if [ $deployment_status -ne 0 ]; then
+        echo "Error: VNet deployment failed"
+        echo "Last 50 lines of output:"
+        echo "$output" | tail -n 50
+        exit 1
+      else
+        echo "VNet deployment succeeded"
+      fi
+
+- task: AzureCLI@2
+  displayName: 'Associate NSG with Subnets'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Get the NSG resource ID
+      nsgId=$(az network nsg show --resource-group $(resourceGroupName) --name $(nsgName) --query id -o tsv)
+      
+      # Associate NSG with dmz-subnet and app-subnet
+      az network vnet subnet update \
+        --resource-group $(resourceGroupName) \
+        --vnet-name $(vnetName) \
+        --name dmz-subnet \
+        --network-security-group $nsgId
+
+      az network vnet subnet update \
+        --resource-group $(resourceGroupName) \
+        --vnet-name $(vnetName) \
+        --name app-subnet \
+        --network-security-group $nsgId
+
+- task: AzureCLI@2
+  displayName: 'Deploy Static Web App'
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      set -e
+      set -x
+
+      bicep_file="$(Build.SourcesDirectory)/avm/res/web/static-web-app/main.bicep"
+      echo "Checking for Bicep file: $bicep_file"
+      if [ ! -f "$bicep_file" ]; then
+        echo "Error: Static Web App Bicep file not found at $bicep_file"
+        exit 1
+      fi
+
+      echo "Preparing deployment parameters"
+      params=$(cat <<EOF
+      {
+        "name": {"value": "$(staticWebAppName)"},
+        "location": {"value": "$(location)"},
+        "sku": {"value": "$(staticWebAppSku)"},
+        "allowConfigFileUpdates": {"value": true},
+        "stagingEnvironmentPolicy": {"value": "Enabled"},
+        "enterpriseGradeCdnStatus": {"value": "Disabled"}
+      }
+      EOF
+      )
+
+      echo "Starting Static Web App deployment"
+      output=$(az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file "$bicep_file" \
+        --parameters "$params" \
+        --debug 2>&1)
+      
+      deployment_status=$?
+      echo "Deployment output:"
+      echo "$output"
+
+      if [ $deployment_status -ne 0 ]; then
+        echo "Error: Static Web App deployment failed"
+        echo "Last 50 lines of output:"
+        echo "$output" | tail -n 50
+        exit 1
+      else
+        echo "Static Web App deployment succeeded"
+      fi
