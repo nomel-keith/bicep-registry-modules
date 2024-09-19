@@ -58,13 +58,24 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
-      # Check if the Bicep file exists
-      if [ ! -f "$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep" ]; then
-        echo "Error: VNet Bicep file not found"
+      set -e
+      set -x
+
+      echo "Current working directory: $(pwd)"
+      echo "Listing contents of Build.SourcesDirectory:"
+      ls -R $(Build.SourcesDirectory)
+
+      bicep_file="$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep"
+      echo "Checking for Bicep file: $bicep_file"
+      if [ ! -f "$bicep_file" ]; then
+        echo "Error: VNet Bicep file not found at $bicep_file"
         exit 1
       fi
 
-      # Define parameters as a JSON string
+      echo "Bicep file found. Displaying first few lines:"
+      head -n 10 "$bicep_file"
+
+      echo "Preparing deployment parameters"
       params=$(cat <<EOF
       {
         "name": {"value": "$(vnetName)"},
@@ -85,19 +96,28 @@ steps:
             }
           ]
         }
-      })
+      }
+      EOF
+      )
 
-      # Deploy VNet with error handling
-      az deployment group create \
+      echo "Starting VNet deployment"
+      output=$(az deployment group create \
         --resource-group $(resourceGroupName) \
-        --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
+        --template-file "$bicep_file" \
         --parameters "$params" \
-        --debug
+        --debug 2>&1)
+      
+      deployment_status=$?
+      echo "Deployment output:"
+      echo "$output"
 
-      # Check deployment status
-      if [ $? -ne 0 ]; then
+      if [ $deployment_status -ne 0 ]; then
         echo "Error: VNet deployment failed"
+        echo "Last 50 lines of output:"
+        echo "$output" | tail -n 50
         exit 1
+      else
+        echo "VNet deployment succeeded"
       fi
 
 - task: AzureCLI@2
