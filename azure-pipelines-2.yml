@@ -10,7 +10,7 @@ variables:
     value: 'myVNet'
   - name: nsgName
     value: 'myNSG'
-  - name: staticWebAppName
+  - name: staticSiteName
     value: 'myznastatic123'
   - name: staticWebAppSku
     value: 'Free'
