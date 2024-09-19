@@ -1,19 +1,30 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- main
+  - main
+
+variables:
+  - name: resourceGroupName
+    value: 'rg-vnet-example'
+  - name: location
+    value: 'eastus'
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'terraform-demo'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      # Create resource group if it doesn't exist
+      az group create --name $(resourceGroupName) --location $(location)
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+      # Deploy the Bicep template
+      az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --template-file main.bicep \
+        --parameters \
+          name=myVNet \
+          addressPrefixes="['10.0.0.0/16']" \
+          subnets="[{'name': 'default', 'addressPrefix': '10.0.0.0/24'}]"
