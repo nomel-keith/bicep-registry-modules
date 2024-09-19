@@ -31,26 +31,25 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      # Check if the Bicep file exists
+      if [ ! -f "$(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep" ]; then
+        echo "Error: NSG Bicep file not found"
+        exit 1
+      fi
+
+      # Deploy NSG with error handling
       az deployment group create \
         --resource-group $(resourceGroupName) \
         --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
-        --parameters \
-          name=$(nsgName) \
-          securityRules="[
-            {
-              name: 'AllowHTTPInbound',
-              properties: {
-                protocol: 'Tcp',
-                sourcePortRange: '*',
-                destinationPortRange: '80',
-                sourceAddressPrefix: '*',
-                destinationAddressPrefix: '*',
-                access: 'Allow',
-                priority: 100,
-                direction: 'Inbound'
-              }
-            }
-          ]"
+        --parameters name=$(nsgName) \
+        --parameters securityRules='[{"name":"AllowHTTPSInbound","properties":{"protocol":"Tcp","sourcePortRange":"*","destinationPortRange":"443","sourceAddressPrefix":"*","destinationAddressPrefix":"*","access":"Allow","priority":100,"direction":"Inbound"}}]' \
+        --debug
+
+      # Check deployment status
+      if [ $? -ne 0 ]; then
+        echo "Error: NSG deployment failed"
+        exit 1
+      fi
 
 - task: AzureCLI@2
   displayName: 'Deploy Virtual Network'
