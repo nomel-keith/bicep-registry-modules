@@ -58,26 +58,47 @@ steps:
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
+      # Check if the Bicep file exists
+      if [ ! -f "$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep" ]; then
+        echo "Error: VNet Bicep file not found"
+        exit 1
+      fi
+
+      # Define parameters as a JSON string
+      params=$(cat <<EOF
+      {
+        "name": {"value": "$(vnetName)"},
+        "addressPrefixes": {"value": ["10.0.0.0/25"]},
+        "subnets": {
+          "value": [
+            {
+              "name": "dmz-subnet",
+              "addressPrefix": "10.0.0.0/27"
+            },
+            {
+              "name": "app-subnet",
+              "addressPrefix": "10.0.0.32/27"
+            },
+            {
+              "name": "data-subnet",
+              "addressPrefix": "10.0.0.64/27"
+            }
+          ]
+        }
+      })
+
+      # Deploy VNet with error handling
       az deployment group create \
         --resource-group $(resourceGroupName) \
         --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
-        --parameters \
-          name=$(vnetName) \
-          addressPrefixes="['10.0.0.0/25']" \
-          subnets="[
-            {
-              name: 'dmz-subnet',
-              addressPrefix: '10.0.0.0/27'
-            },
-            {
-              name: 'app-subnet',
-              addressPrefix: '10.0.0.32/27'
-            },
-            {
-              name: 'data-subnet',
-              addressPrefix: '10.0.0.64/27'
-            }
-          ]"
+        --parameters "$params" \
+        --debug
+
+      # Check deployment status
+      if [ $? -ne 0 ]; then
+        echo "Error: VNet deployment failed"
+        exit 1
+      fi
 
 - task: AzureCLI@2
   displayName: 'Associate NSG with Subnets'
