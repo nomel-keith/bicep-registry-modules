@@ -2,13 +2,13 @@ trigger:
   - main
 
 variables:
-  environments: ['dev', 'qa', 'uat', 'prod']
+  environments: 'dev, qa, uat, prod'
 
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-- ${{ each env in variables.environments }}:
+- ${{ each env in split(variables.environments, ',') }}:
   - stage: WhatIf_${{ env }}
     condition: |
       and(
