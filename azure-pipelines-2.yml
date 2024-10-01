@@ -2,7 +2,7 @@ trigger:
   - main
 
 variables:
-  environments: 'dev, qa, uat, prod'
+  environments: 'dev,qa,uat,prod'
 
 pool:
   vmImage: 'ubuntu-latest'
