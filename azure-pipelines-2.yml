@@ -32,22 +32,28 @@ stages:
           inlineScript: |
             # Run What-If for NSG
             echo "What-If Analysis for NSG:"
+            echo "Current working directory: $(pwd)"
+
+            # Extract resource group name from parameters file
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/${{ env }}-parameters.json")
+            echo "Resource Group Name: $resourceGroupName"
+
             az deployment group what-if \
-              --resource-group $(resourceGroupName) \
+              --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
 
             # Run What-If for VNet
             echo "What-If Analysis for VNet:"
             az deployment group what-if \
-              --resource-group $(resourceGroupName) \
+              --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
 
             # Run What-If for Static Web App
             echo "What-If Analysis for Static Web App:"
             az deployment group what-if \
-              --resource-group $(resourceGroupName) \
+              --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
 
@@ -80,7 +86,7 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            az group create --name $(resourceGroupName) --location $(location)
+            az group create --name "$resourceGroupName" --location $(location)
 
       - task: AzureCLI@2
         displayName: 'Deploy Network Security Group'
@@ -90,7 +96,7 @@ stages:
           scriptLocation: 'inlineScript'
           inlineScript: |
             az deployment group create \
-              --resource-group $(resourceGroupName) \
+              --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
 
