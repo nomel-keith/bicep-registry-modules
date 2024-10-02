@@ -35,7 +35,7 @@ stages:
             echo "Current working directory: $(pwd)"
 
             # Extract resource group name from parameters file
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/${{ env }}-parameters.json")
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
             echo "Resource Group Name: $resourceGroupName"
 
             az deployment group what-if \
