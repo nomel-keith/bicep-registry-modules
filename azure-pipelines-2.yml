@@ -94,7 +94,6 @@ stages:
             az deployment group create \
               --resource-group "$resourceGroupName" \
               --template-file "$bicepFile" \
-              --parameters "@$paramFile" \
               --parameters name="$nsgName" \
               --debug
 
@@ -147,7 +146,6 @@ stages:
             az deployment group create \
               --resource-group "$resourceGroupName" \
               --template-file "$(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep" \
-              --parameters "@$paramFile" \
               --parameters name="$nsgName" \
               --debug
 
