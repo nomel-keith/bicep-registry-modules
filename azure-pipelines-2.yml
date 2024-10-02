@@ -43,11 +43,49 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
+            set -e  # Exit immediately if a command exits with a non-zero status
+            set -x  # Print commands and their arguments as they are executed
+
+            # Extract parameters
+            paramFile="$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json"
+            echo "Parameter file: $paramFile"
+
+            if [ ! -f "$paramFile" ]; then
+              echo "Error: Parameter file not found: $paramFile"
+              exit 1
+            fi
+
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
+            location=$(jq -r '.parameters.location.value' "$paramFile")
+            nsgName=$(jq -r '.parameters.nsgName.value' "$paramFile")
+
+            echo "Resource Group: $resourceGroupName"
+            echo "Location: $location"
+            echo "NSG Name: $nsgName"
+
+            # Check if resource group exists
+            if ! az group show --name "$resourceGroupName" &>/dev/null; then
+              echo "Creating resource group $resourceGroupName"
+              az group create --name "$resourceGroupName" --location "$location"
+            else
+              echo "Resource group $resourceGroupName already exists"
+            fi
+
+            # Deploy NSG
+            echo "Deploying Network Security Group"
             az deployment group create \
               --resource-group "$resourceGroupName" \
-              --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
-              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+              --template-file "$(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep" \
+              --parameters "@$paramFile" \
+              --parameters name="$nsgName" \
+              --debug
+
+            if [ $? -eq 0 ]; then
+              echo "NSG deployment successful"
+            else
+              echo "NSG deployment failed"
+              exit 1
+            fi
 
       - task: AzureCLI@2
         displayName: 'Deploy Virtual Network'
