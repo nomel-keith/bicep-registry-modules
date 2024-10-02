@@ -113,6 +113,8 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
+            set -e  # Exit immediately if a command exits with a non-zero status
+
             echo "Starting Virtual Network deployment script"
 
             # Extract parameters
@@ -130,14 +132,39 @@ stages:
             resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
             location=$(jq -r '.parameters.location.value' "$paramFile")
             vNetName=$(jq -r '.parameters.vNetName.value' "$paramFile")
-            addressPrefixes=$(jq -r '.parameters.addressPrefixes.value | join(" ")' "$paramFile")
 
+            # Handle addressPrefixes as either string or array
+            addressPrefixes=$(jq -r '.parameters.addressPrefixes.value | if type=="array" then join(" ") else . end' "$paramFile")
+
+            echo "Extracted parameters:"
+            echo "Resource Group: $resourceGroupName"
+            echo "Location: $location"
+            echo "VNet Name: $vNetName"
+            echo "Address Prefixes: $addressPrefixes"
+
+            # Validate addressPrefixes
+            if [ -z "$addressPrefixes" ]; then
+              echo "Error: addressPrefixes is empty or not found in the parameters file"
+              exit 1
+            fi
+
+            # Deploy VNet
             az deployment group create \
               --resource-group "$resourceGroupName" \
-              --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
+              --template-file "$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep" \
               --parameters name="$vNetName" \
               --parameters location="$location" \
               --parameters addressPrefixes="$addressPrefixes" \
+              --debug
+
+            if [ $? -eq 0 ]; then
+              echo "VNet deployment successful"
+            else
+              echo "VNet deployment failed"
+              exit 1
+            fi
+
+            echo "VNet deployment script completed"
 
       - task: AzureCLI@2
         displayName: 'Associate NSG with Subnets'
