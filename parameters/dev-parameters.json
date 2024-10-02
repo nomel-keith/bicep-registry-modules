@@ -6,19 +6,19 @@
       "value": "dev"
     },
     "resourceGroupName": {
-      "value": "[format('rg-vnet-nsg-swa-{0}', parameters('environment'))]"
+      "value": "rg-vnet-nsg-swa-dev"
     },
     "location": {
       "value": "eastus2"
     },
     "vnetName": {
-      "value": "[format('myVNet-{0}', parameters('environment'))]"
+      "value": "myVNet-dev"
     },
     "nsgName": {
-      "value": "[format('myNSG-{0}', parameters('environment'))]"
+      "value": "myNSG-dev"
     },
     "staticSiteName": {
-      "value": "[format('myznastatic-{0}', parameters('environment'))]"
+      "value": "myznastatic-dev"
     },
     "staticSiteSku": {
       "value": "Free"
@@ -27,7 +27,7 @@
       "value": ["10.0.0.0/16"]
     },
     "name": {
-      "value": "[format('myDeployment-{0}', parameters('environment'))]"
+      "value": "myDeployment-dev"
     },
     "subnets": {
       "value": [
