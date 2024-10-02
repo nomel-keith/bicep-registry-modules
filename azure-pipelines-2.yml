@@ -130,7 +130,7 @@ stages:
             resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
             location=$(jq -r '.parameters.location.value' "$paramFile")
             vNetName=$(jq -r '.parameters.vNetName.value' "$paramFile")
-            addressPrefixes  =$(jq -r '.parameters.addressPrefixes.value' "$paramFile")
+            addressPrefixes=$(jq -r '.parameters.addressPrefixes.value | join(" ")' "$paramFile")
 
             az deployment group create \
               --resource-group "$resourceGroupName" \
