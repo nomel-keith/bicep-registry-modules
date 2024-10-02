@@ -129,14 +129,15 @@ stages:
 
             resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
             location=$(jq -r '.parameters.location.value' "$paramFile")
-            nsgName=$(jq -r '.parameters.nsgName.value' "$paramFile")
-
-
+            vNetName=$(jq -r '.parameters.vNetName.value' "$paramFile")
+            addressPrefixes  =$(jq -r '.parameters.addressPrefixes.value' "$paramFile")
 
             az deployment group create \
               --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
-              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+              --parameters name="$vNetName" \
+              --parameters location="$location" \
+              --parameters addressPrefixes="$addressPrefixes" \
 
       - task: AzureCLI@2
         displayName: 'Associate NSG with Subnets'

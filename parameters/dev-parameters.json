@@ -29,6 +29,9 @@
     "name": {
       "value": "myDeployment-dev"
     },
+    "vNetName": {
+      "value": "myVnet-dev"
+    },
     "subnets": {
       "value": [
         {
