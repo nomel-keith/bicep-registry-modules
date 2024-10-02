@@ -9,7 +9,7 @@ pool:
 
 stages:
 - ${{ each env in split(variables.environments, ',') }}:
-  - stage: Infrastructure_${{ env }}
+  - stage: WhatIf_${{ env }}
     condition: |
       and(
         succeeded(),
@@ -20,6 +20,60 @@ stages:
           and(eq('${{ env }}', 'prod'), succeeded('Infrastructure_uat'))
         )
       )
+    jobs:
+    - job: RunWhatIf
+      steps:
+      - task: AzureCLI@2
+        displayName: 'Run What-If Analysis'
+        inputs:
+          azureSubscription: 'terraform-demo'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            # Run What-If for NSG
+            echo "What-If Analysis for NSG:"
+            echo "Current working directory: $(pwd)"
+
+            # Extract resource group name from parameters file
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
+            echo "Resource Group Name: $resourceGroupName"
+
+            az deployment group what-if \
+              --resource-group "$resourceGroupName" \
+              --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
+              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+
+            # Run What-If for VNet
+            echo "What-If Analysis for VNet:"
+            az deployment group what-if \
+              --resource-group "$resourceGroupName" \
+              --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
+              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+
+            # Run What-If for Static Web App
+            echo "What-If Analysis for Static Web App:"
+            az deployment group what-if \
+              --resource-group "$resourceGroupName" \
+              --template-file $(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep \
+              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+
+  - stage: ApproveWhatIf_${{ env }}
+    condition: succeeded('WhatIf_${{ env }}')
+    jobs:
+    - job: ApproveChanges
+      pool: server
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 1440
+        inputs:
+          notifyUsers: |
+            user@example.com
+            example@example.com
+          instructions: 'Please review the What-If analysis for ${{ env }} environment and approve to proceed with the deployment.'
+          onTimeout: 'reject'
+
+  - stage: Infrastructure_${{ env }}
+    condition: succeeded('ApproveWhatIf_${{ env }}')
     jobs:
     - job: DeployInfrastructure
       pool:
@@ -32,9 +86,7 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            location=$(jq -r '.parameters.location.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            az group create --name "$resourceGroupName" --location "$location"
+            az group create --name "$resourceGroupName" --location $(location)
 
       - task: AzureCLI@2
         displayName: 'Deploy Network Security Group'
@@ -43,7 +95,6 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
             az deployment group create \
               --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep \
@@ -56,9 +107,8 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
             az deployment group create \
-              --resource-group "$resourceGroupName" \
+              --resource-group $(resourceGroupName) \
               --template-file $(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
 
@@ -69,20 +119,17 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            nsgName=$(jq -r '.parameters.nsgName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            vnetName=$(jq -r '.parameters.vnetName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            nsgId=$(az network nsg show --resource-group "$resourceGroupName" --name "$nsgName" --query id -o tsv)
+            nsgId=$(az network nsg show --resource-group $(resourceGroupName) --name $(nsgName) --query id -o tsv)
 
             az network vnet subnet update \
-              --resource-group "$resourceGroupName" \
-              --vnet-name "$vnetName" \
+              --resource-group $(resourceGroupName) \
+              --vnet-name $(vnetName) \
               --name dmz-subnet \
               --network-security-group $nsgId
 
             az network vnet subnet update \
-              --resource-group "$resourceGroupName" \
-              --vnet-name "$vnetName" \
+              --resource-group $(resourceGroupName) \
+              --vnet-name $(vnetName) \
               --name app-subnet \
               --network-security-group $nsgId
 
@@ -93,10 +140,11 @@ stages:
       pool: server
       steps:
       - task: ManualValidation@0
-        timeoutInMinutes: 5440
+        timeoutInMinutes: 1440
         inputs:
           notifyUsers: |
-            keith.lemon@zurichna.com
+            user@example.com
+            example@example.com
           instructions: 'Please validate the ${{ env }} infrastructure deployment and approve to proceed with Static Web App deployment.'
           onTimeout: 'reject'
 
@@ -114,8 +162,7 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
             az deployment group create \
-              --resource-group "$resourceGroupName" \
+              --resource-group $(resourceGroupName) \
               --template-file $(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep \
               --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
