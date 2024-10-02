@@ -154,7 +154,7 @@ stages:
               --template-file "$(Build.SourcesDirectory)/avm/res/network/virtual-network/main.bicep" \
               --parameters name="$vNetName" \
               --parameters location="$location" \
-              --parameters addressPrefixes="$addressPrefixes" \
+              --parameters addressPrefixes="['$addressPrefixes']" \
               --debug
 
             if [ $? -eq 0 ]; then
