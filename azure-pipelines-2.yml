@@ -194,8 +194,28 @@ stages:
           scriptType: 'bash'
           scriptLocation: 'inlineScript'
           inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
+            set -e  # Exit immediately if a command exits with a non-zero status
+
+            echo "Starting Virtual Network deployment script"
+
+            # Extract parameters
+            paramFile="$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json"
+            echo "Parameter file path: $paramFile"
+
+            if [ ! -f "$paramFile" ]; then
+              echo "Error: Parameter file not found: $paramFile"
+              exit 1
+            fi
+
+            echo "Parameter file contents:"
+            cat "$paramFile"
+
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
+            location=$(jq -r '.parameters.location.value' "$paramFile")
+            staticSiteName=$(jq -r '.parameters.staticSiteName.value' "$paramFile")
+
             az deployment group create \
               --resource-group "$resourceGroupName" \
               --template-file $(Build.SourcesDirectory)/avm/res/web/static-site/main.bicep \
-              --parameters @$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json
+              --parameters name="$staticSiteName" \
+              --debug
