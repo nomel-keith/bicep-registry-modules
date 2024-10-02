@@ -166,30 +166,6 @@ stages:
 
             echo "VNet deployment script completed"
 
-      - task: AzureCLI@2
-        displayName: 'Associate NSG with Subnets'
-        inputs:
-          azureSubscription: 'terraform-demo'
-          scriptType: 'bash'
-          scriptLocation: 'inlineScript'
-          inlineScript: |
-            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            nsgName=$(jq -r '.parameters.nsgName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            vnetName=$(jq -r '.parameters.vnetName.value' "$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json")
-            nsgId=$(az network nsg show --resource-group "$resourceGroupName" --name "$nsgName" --query id -o tsv)
-
-            az network vnet subnet update \
-              --resource-group "$resourceGroupName" \
-              --vnet-name "$vnetName" \
-              --name dmz-subnet \
-              --network-security-group $nsgId
-
-            az network vnet subnet update \
-              --resource-group "$resourceGroupName" \
-              --vnet-name "$vnetName" \
-              --name app-subnet \
-              --network-security-group $nsgId
-
   - stage: ApprovalForStaticWebApp_${{ env }}
     condition: succeeded('Infrastructure_${{ env }}')
     jobs:
