@@ -46,6 +46,77 @@ stages:
             set -e  # Exit immediately if a command exits with a non-zero status
             set -x  # Print commands and their arguments as they are executed
 
+            echo "Starting NSG deployment script"
+
+            # Extract parameters
+            paramFile="$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json"
+            echo "Parameter file path: $paramFile"
+
+            if [ ! -f "$paramFile" ]; then
+              echo "Error: Parameter file not found: $paramFile"
+              exit 1
+            fi
+
+            echo "Parameter file contents:"
+            cat "$paramFile"
+
+            resourceGroupName=$(jq -r '.parameters.resourceGroupName.value' "$paramFile")
+            location=$(jq -r '.parameters.location.value' "$paramFile")
+            nsgName=$(jq -r '.parameters.nsgName.value' "$paramFile")
+
+            echo "Extracted parameters:"
+            echo "Resource Group: $resourceGroupName"
+            echo "Location: $location"
+            echo "NSG Name: $nsgName"
+
+            # Check if resource group exists
+            echo "Checking if resource group exists"
+            if ! az group show --name "$resourceGroupName" &>/dev/null; then
+              echo "Creating resource group $resourceGroupName"
+              az group create --name "$resourceGroupName" --location "$location"
+            else
+              echo "Resource group $resourceGroupName already exists"
+            fi
+
+            # Deploy NSG
+            echo "Deploying Network Security Group"
+            bicepFile="$(Build.SourcesDirectory)/avm/res/network/network-security-group/main.bicep"
+            echo "Bicep file path: $bicepFile"
+
+            if [ ! -f "$bicepFile" ]; then
+              echo "Error: Bicep file not found: $bicepFile"
+              exit 1
+            fi
+
+            echo "Bicep file contents:"
+            cat "$bicepFile"
+
+            az deployment group create \
+              --resource-group "$resourceGroupName" \
+              --template-file "$bicepFile" \
+              --parameters "@$paramFile" \
+              --parameters name="$nsgName" \
+              --debug
+
+            if [ $? -eq 0 ]; then
+              echo "NSG deployment successful"
+            else
+              echo "NSG deployment failed"
+              exit 1
+            fi
+
+            echo "NSG deployment script completed"
+
+      - task: AzureCLI@2
+        displayName: 'Deploy Network Security Group2'
+        inputs:
+          azureSubscription: 'terraform-demo'
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            set -e  # Exit immediately if a command exits with a non-zero status
+            set -x  # Print commands and their arguments as they are executed
+
             # Extract parameters
             paramFile="$(Build.SourcesDirectory)/parameters/${{ env }}-parameters.json"
             echo "Parameter file: $paramFile"
