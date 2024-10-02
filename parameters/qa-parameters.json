@@ -19,6 +19,12 @@
       },
       "staticSiteSku": {
         "value": "Free"
+      },
+      "addressPrefixes": {
+        "value": ["10.0.0.0/16"]
+      },
+      "name": {
+        "value": "myDeployment-qa"
       }
     }
   }
